@@ -50,7 +50,7 @@ impl DiffLocation {
     pub(crate) fn find_lines<'a>(
         &self,
         repo: &'a git2::Repository,
-    ) -> Result<Vec<git2::DiffLine<'a>>, git2::Error> {
+    ) -> Result<Vec<(char, &'a [u8])>, git2::Error> {
         let old = repo.find_commit(self.base)?.tree()?;
         let new = repo.find_commit(self.head)?.tree()?;
         let old = old.get_path(&self.path)?.to_object(repo)?.peel_to_blob()?;
@@ -61,7 +61,11 @@ impl DiffLocation {
         self.selection
             .lines
             .clone()
-            .map(|i| patch.line_in_hunk(self.selection.hunk, i))
+            .map(|i| {
+                patch
+                    .line_in_hunk(self.selection.hunk, i)
+                    .map(|line| (line.origin(), line.content()))
+            })
             .collect::<Result<Vec<_>, _>>()
     }
 
@@ -124,7 +128,7 @@ fn main() {
     };
     let lines = location.find_lines(&repo).unwrap();
     println!("PRINT FROM OUTSIDE find_lines");
-    for line in lines {
-        print_diff_line(&line);
+    for (origin, content) in lines {
+        print!("{origin} {}", String::from_utf8_lossy(&content),);
     }
 }
